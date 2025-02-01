@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My First dApp</title>
+
+    <style>
+      body {
+        text-align: center;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      button {
+        width: 50%;
+        margin: 10px 0px 5px 0px;
+      }
+
+      #portfolio_container {
+        font-family: Arial, Helvetica, sans-serif;
+        border-collapse: collapse;
+      }
+
+      #portfolio_container td,
+      #portfolio_container th {
+        border: 1px solid #ddd;
+        padding: 8px;
+      }
+
+      #portfolio_container tr:nth-child(even) {
+        background-color: #f2f2f2;
+      }
+
+      #portfolio_container tr:hover {
+        background-color: #ddd;
+      }
+
+      #portfolio_container th {
+        padding-top: 12px;
+        padding-bottom: 12px;
+        text-align: left;
+        background-color: #04aa6d;
+        color: white;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>My Portfolio dApp!</h1>
+    <div id="account">
+      <h3>Connect To Wallet</h3>
+      <button onclick="connectToWallet()">Connect to Waller</button>
+      <button onclick="disconnectFromWallet()">Disconnect from Waller</button>
+      <br />
+      <label for="wallet_address_lb"><strong>Wallet Addres:</strong> </label>
+      <label id="wallet_address_lb">Disconnected</label>
+      <hr />
+    </div>
+
+    <div id="editPortfolio">
+      <h3 style="color: green">Add Asset</h3>
+      <label for="asset_symbol_txt">Asset Symbol:</label>
+      <input type="text" id="asset_symbol_txt" /> <br />
+      <button style="color: green" onclick="addAsset()">Add Asset</button>
+
+      <hr />
+
+      <h3 style="color: chocolate">Add Asset Transaction(or Quick Add)</h3>
+      <label for="update_asset_symbol_txt">Asset Symbol:</label>
+      <input type="text" id="update_asset_symbol_txt" />
+      <label for="update_asset_size_txt">Size (- for reduction):</label>
+      <input type="text" id="update_asset_size_txt" /> <br />
+      <button style="color: chocolate" onclick="updateAsset()">
+        Add Asset Transaction
+      </button>
+
+      <hr />
+
+      <h3 style="color: brown">Delete Asset</h3>
+      <label for="delete_asset_symbol_txt">Asset Symbol:</label>
+      <input type="text" id="delete_asset_symbol_txt" /> <br />
+      <button style="color: brown" onclick="deleteAsset()">Delete Asset</button>
+
+      <hr />
+    </div>
+
+    <div id="portfolio">
+      <button style="color: green; font-size: 16px" onclick="getPortfolio()">
+        <strong>View Portfolio</strong>
+      </button>
+      <div id="portfolio_container"></div>
+    </div>
+  </body>
+  <!--Add ether.js-->
+  <script
+    src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js"
+    type="application/javascript"
+  ></script>
+
+  <script>
+    const XRP_EVM_DEV_URL = "https://rpc-evm-sidechain.xrpl.org";
+    const CONTRACT_ADDRESS = "0x29BBF5f4f19F7F782a26b51Ae22573B29a9e8C4e";
+    const CONTRACT_ABI = [
+      {
+        inputs: [],
+        stateMutability: "nonpayable",
+        type: "constructor",
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: "string",
+            name: "symbol",
+            type: "string",
+          },
+          {
+            indexed: true,
+            internalType: "string",
+            name: "action",
+            type: "string",
+          },
+          {
+            indexed: false,
+            internalType: "int256",
+            name: "amount",
+            type: "int256",
+          },
+          {
+            indexed: false,
+            internalType: "uint256",
+            name: "timestamp",
+            type: "uint256",
+          },
+        ],
+        name: "AssetOperation",
+        type: "event",
+      },
+      {
+        inputs: [
+          {
+            internalType: "string",
+            name: "symbol",
+            type: "string",
+          },
+        ],
+        name: "addAsset",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function",
+      },
+      {
+        inputs: [
+          {
+            internalType: "address",
+            name: "",
+            type: "address",
+          },
+          {
+            internalType: "uint256",
+            name: "",
+            type: "uint256",
+          },
+        ],
+        name: "assets",
+        outputs: [
+          {
+            internalType: "bytes8",
+            name: "symbol",
+            type: "bytes8",
+          },
+          {
+            internalType: "int256",
+            name: "size",
+            type: "int256",
+          },
+        ],
+        stateMutability: "view",
+        type: "function",
+      },
+      {
+        inputs: [
+          {
+            internalType: "bytes8",
+            name: "_bytes",
+            type: "bytes8",
+          },
+        ],
+        name: "bytesToString",
+        outputs: [
+          {
+            internalType: "string",
+            name: "",
+            type: "string",
+          },
+        ],
+        stateMutability: "pure",
+        type: "function",
+      },
+      {
+        inputs: [
+          {
+            internalType: "string",
+            name: "symbol",
+            type: "string",
+          },
+        ],
+        name: "findAsset",
+        outputs: [
+          {
+            components: [
+              {
+                internalType: "bytes8",
+                name: "symbol",
+                type: "bytes8",
+              },
+              {
+                internalType: "int256",
+                name: "size",
+                type: "int256",
+              },
+            ],
+            internalType: "struct Portfolio.Asset",
+            name: "",
+            type: "tuple",
+          },
+        ],
+        stateMutability: "view",
+        type: "function",
+      },
+      {
+        inputs: [],
+        name: "getPortfolio",
+        outputs: [
+          {
+            components: [
+              {
+                internalType: "bytes8",
+                name: "symbol",
+                type: "bytes8",
+              },
+              {
+                internalType: "int256",
+                name: "size",
+                type: "int256",
+              },
+            ],
+            internalType: "struct Portfolio.Asset[]",
+            name: "",
+            type: "tuple[]",
+          },
+        ],
+        stateMutability: "view",
+        type: "function",
+      },
+      {
+        inputs: [
+          {
+            internalType: "string",
+            name: "symbol",
+            type: "string",
+          },
+        ],
+        name: "hasAsset",
+        outputs: [
+          {
+            internalType: "bool",
+            name: "",
+            type: "bool",
+          },
+        ],
+        stateMutability: "view",
+        type: "function",
+      },
+      {
+        inputs: [],
+        name: "owner",
+        outputs: [
+          {
+            internalType: "address",
+            name: "",
+            type: "address",
+          },
+        ],
+        stateMutability: "view",
+        type: "function",
+      },
+      {
+        inputs: [
+          {
+            internalType: "string",
+            name: "symbol",
+            type: "string",
+          },
+        ],
+        name: "removeAsset",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function",
+      },
+      {
+        inputs: [
+          {
+            internalType: "string",
+            name: "_str",
+            type: "string",
+          },
+        ],
+        name: "stringToBytes",
+        outputs: [
+          {
+            internalType: "bytes8",
+            name: "",
+            type: "bytes8",
+          },
+        ],
+        stateMutability: "pure",
+        type: "function",
+      },
+      {
+        inputs: [
+          {
+            internalType: "string",
+            name: "symbol",
+            type: "string",
+          },
+          {
+            internalType: "int256",
+            name: "size",
+            type: "int256",
+          },
+        ],
+        name: "updateAsset",
+        outputs: [],
+        stateMutability: "nonpayable",
+        type: "function",
+      },
+    ];
+
+    let provider = null;
+    let signer = null;
+    let walletAddress = null;
+    let contract_instance = null;
+
+    // convert a hex string to ascii str
+    function hex_to_ascii(hexStr) {
+      hexStr = hexStr.toString();
+      var strAscii = "";
+      for (var n = 0; n < hexStr.length; n += 2) {
+        strAscii += String.fromCharCode(parseInt(hexStr.substr(n, 2), 16));
+      }
+      return strAscii.replace(/\0/g, "");
+    }
+
+    // connect to wallet
+    async function connectToWallet() {
+      // A Web3Provider wraps a standard Web3 provider, which is
+      // what MetaMask injects as window.ethereum into each page
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+
+      // get network
+      const network = await provider.getNetwork();
+
+      // ensure that we are in XRPL EVM Side Chain
+      if (network.chainId != 1440002) {
+        alert(
+          "You are not connected to XRPL EVM Sidechain! \n" +
+            "Please connect and try again!"
+        );
+
+        // return since we are not in the side chain
+        return;
+      }
+
+      // MetaMask requires requesting permission to connect users accounts
+      if (walletAddress == null) {
+        // Runs only they are brand new, or have hit the disconnect button
+        await window.ethereum.request({
+          method: "wallet_requestPermissions",
+          params: [
+            {
+              eth_accounts: {},
+            },
+          ],
+        });
+      }
+
+      walletAddress = await window.ethereum.request({
+        method: "eth_requestAccounts",
+        params: [
+          {
+            eth_accounts: {},
+          },
+        ],
+      });
+
+      console.log(walletAddress);
+      document.getElementById("wallet_address_lb").innerHTML = walletAddress;
+
+      // The MetaMask plugin also allows signing transactions to
+      // send ether and pay to change state within the blockchain.
+      // For this, you need the account signer...
+      signer = provider.getSigner();
+      console.log(signer);
+
+      // create contract instance
+      contract_instance = new ethers.Contract(
+        CONTRACT_ADDRESS,
+        CONTRACT_ABI,
+        signer
+      );
+
+      // TODO: ADD CHAIN ID VALIDATION
+    }
+
+    // disconnect wallet
+    async function disconnectFromWallet() {
+      provider = null;
+      signer = null;
+      walletAddress = null;
+
+      document.getElementById("wallet_address_lb").innerHTML = "Disconnected";
+    }
+
+    // asset asset client event handling
+    async function addAsset() {
+      if (signer == null) {
+        alert("Please connect wallet!");
+        console.error("Signer is not connected");
+        return;
+      }
+
+      let asset_symbol = document
+        .getElementById("asset_symbol_txt")
+        .value.toUpperCase();
+      console.log(asset_symbol);
+
+      try {
+        // try to add the new asset
+        await contract_instance.addAsset(asset_symbol);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        alert("Asset " + asset_symbol + " added to Portfolio!");
+        console.log("Asset " + asset_symbol + " added to Portfolio!");
+      }
+    }
+
+    // update an asset
+    async function updateAsset() {
+      if (signer == null) {
+        alert("Please connect wallet!");
+        console.error("Signer is not connected");
+        return;
+      }
+
+      let asset_symbol = document
+        .getElementById("update_asset_symbol_txt")
+        .value.toUpperCase();
+      console.log(asset_symbol);
+
+      let asset_size = document.getElementById("update_asset_size_txt").value;
+      console.log(asset_size);
+
+      try {
+        // try to add the new asset
+        await contract_instance.updateAsset(
+          asset_symbol,
+          ethers.utils.parseEther(asset_size)
+        );
+      } catch (err) {
+        console.error(err);
+      } finally {
+        alert("Asset " + asset_symbol + " action: " + asset_size + " !");
+        console.log("Asset " + asset_symbol + " action: " + asset_size + " !");
+      }
+    }
+
+    // delete asset from portfolio
+    async function deleteAsset() {
+      if (signer == null) {
+        alert("Please connect wallet!");
+        console.error("Signer is not connected");
+        return;
+      }
+
+      let asset_symbol = document
+        .getElementById("delete_asset_symbol_txt")
+        .value.toUpperCase();
+      console.log(asset_symbol);
+
+      try {
+        // try to add the new asset
+        await contract_instance.removeAsset(asset_symbol);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        alert("Asset " + asset_symbol + " was deleted !");
+        console.log("Asset " + asset_symbol + " was deleted !");
+      }
+    }
+
+    // get portfolio
+    async function getPortfolio() {
+      if (signer == null) {
+        alert("Please connect wallet!");
+        console.error("Signer is not connected");
+        return;
+      }
+
+      try {
+        // try to add the new asset
+        let portfolio = await contract_instance.getPortfolio();
+
+        console.log("Portfolio Size:" + portfolio.length);
+
+        // update portfolio table container
+        portfolioContainer = document.getElementById("portfolio_container");
+        portfolioContainer.innerHTML = genPortfolioTable(portfolio);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // generate dynamically portfolio table with
+    function genPortfolioTable(data) {
+      let table = "<table style='margin: 0px auto;'>";
+      table += "<tr><th>Symbol</th><th>Size</th></tr>";
+      data.forEach((asset) => {
+        table += `<tr><td>${hex_to_ascii(
+          asset.symbol
+        )}</td><td>${ethers.utils.formatUnits(asset.size, "ether")}</td></tr>`;
+      });
+
+      table += "</table>";
+
+      return table;
+    }
+  </script>
+</html>
